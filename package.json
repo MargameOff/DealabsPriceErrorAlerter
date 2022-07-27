@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "axios": "^0.27.2",
+    "discord.js": "^14.0.3",
+    "node-fetch": "^3.2.9",
+    "puppeteer": "^15.5.0",
+    "request-promise-native": "^1.0.9"
+  },
+  "scripts": {
+    "start": "nodemon main.js"
+  }
+}
