@@ -7,7 +7,9 @@ const { EmbedBuilder, WebhookClient } = require('discord.js');
 let cookie = require("./cookie.json");
 let saveData = require("./saveData.json");
 const config = require("./config.json");
-let response = {};
+let response = new Object();
+
+const forumCode = [1063390,1056379]
 
 //Discord.js connexion
 const webhookClient = new WebhookClient({ url: config.webhook });
@@ -54,9 +56,9 @@ async function refreshToken() {
 
 }
 
-async function getNewData() {
+async function getNewData(id) {
     try {
-        response = await axios.post(
+        let data = await axios.post(
             'https://www.dealabs.com/graphql',
             [
                 {
@@ -64,7 +66,7 @@ async function getNewData() {
                     'variables': {
                         'filter': {
                             'threadId': {
-                                'eq': '1063390'
+                                'eq': id
                             }
                         },
                         'page': 1,
@@ -74,7 +76,7 @@ async function getNewData() {
                 {
                     'query': 'query commentSettings($scope: ID!, $comments: Boolean = false, $form: Boolean = false, $adminTools: Boolean = false) {  features {    commentForm(scope: $scope) {      ...commentFeatures @include(if: $comments)      ...commentFormFeatures @include(if: $form)    }    adminTools(scope: "comment") @include(if: $adminTools) {      ...commentAdminFeatures    }  }  settings {    application {      appStore @include(if: $comments)      reCaptcha2Key: reCaptcha(version: 1) @include(if: $form)    }  }}        fragment commentFeatures on CommentFormFeatures {  permalink  issueReporting}        fragment commentFormFeatures on CommentFormFeatures {  enabled  subscribe  reCaptcha  wysiwyg {    html    expand    bold    italic    strike    blockquote  }}        fragment commentAdminFeatures on AdminToolFeatures {  deletable  demoteComment  directMessage  editable  enabled  expanded  imposeInfractions  inspectUser  moderate  promoteComment  seeDeleted  showCountry  spamReport}',
                     'variables': {
-                        'scope': '1063390',
+                        'scope': id,
                         'comments': true,
                         'form': true,
                         'adminTools': true
@@ -83,7 +85,7 @@ async function getNewData() {
                 {
                     'query': 'query newComments($scope: ID!, $limit: Int) {  newComments(threadId: $scope, limit: $limit) {    page    count    latest  }}',
                     'variables': {
-                        'scope': '1063390'
+                        'scope': id
                     }
                 },
                 {
@@ -99,7 +101,7 @@ async function getNewData() {
                     'variables': {
                         'pinnedCommentsFilter': {
                             'threadId': {
-                                'eq': '1063390'
+                                'eq': id
                             },
                             'pinnedOnly': {
                                 'is': true
@@ -111,14 +113,14 @@ async function getNewData() {
                 {
                     'query': 'query additionalInfo($threadId: ID!) {  thread(threadId: {eq: $threadId}) {    additionalInfo {      additionalInfoId: threadAdditionalInfoId      deletedBy {        userId        username      }      deletable      editable      liked      likeCount    }  }}',
                     'variables': {
-                        'threadId': '1063390'
+                        'threadId': id
                     }
                 },
                 {
                     'query': 'query internalLinkingThread($linkingLimit: Int, $threadId: ID!, $userImageSlot: String!, $userImageVariations: [String!]!) {  thread(threadId: {eq: $threadId}) {    relatedMerchants(limit: $linkingLimit) {      merchantId      merchantUrlName      merchantName      merchantNameWithSeoTerm    }    relatedGroups(limit: $linkingLimit) {      threadGroupId      threadGroupName      threadGroupUrlName    }    relatedDiscussions(limit: $linkingLimit) {      threadId      threadTypeId      title      titleSlug      url      commentCount      user {        userId        username        imageUrls(slot: $userImageSlot, variations: $userImageVariations)      }    }  }}',
                     'variables': {
                         'linkingLimit': 15,
-                        'threadId': '1063390',
+                        'threadId': id,
                         'userImageSlot': 'default',
                         'userImageVariations': [
                             'user_small_listing_avatar'
@@ -156,30 +158,37 @@ async function getNewData() {
                 }
             }
         );
+        response[id] = data;
         console.log("Data updated, waiting for next update ...");
     } catch (error) {
+        console.log(error);
         console.log('Token are KO, try to get new one');
         await refreshToken();
         getNewData()
     }
 }
 
-async function checkNewMessage() {
-    let lastComment = response.data[0].data.comments.items[0]
-    if (lastComment.commentId != saveData.lastMessageId) {
+async function checkNewMessage(id) {
+    let lastComment = response[id].data[0].data.comments.items[0]
+    if (lastComment.commentId != saveData.lastMessageId[id]) {
         console.log("New message detected, sending notification");
-        saveData.lastMessageId = lastComment.commentId;
+        saveData.lastMessageId[id] = lastComment.commentId;
         fs.writeFileSync("./saveData.json", JSON.stringify(saveData, null, 2));
-        await sendNotification(lastComment);
+        await sendNotification(lastComment, id);
     } else {
         console.log("No new message detected");
     }
 }
 
-async function sendNotification(comment) {
-    let lienProduit, row;    
+async function sendNotification(comment, id) {
+    let lienProduit, title;
+    if (id ==1056379){
+        title = 'Nouveau Post Erreur de prix !'
+    } else {
+        title = 'Nouveau Post Suivi d\'erreur de prix !'
+    }
     const embed = new EmbedBuilder()
-    .setTitle('Nouveau Post Erreur de prix !')
+    .setTitle(title)
     .addFields(
 		{ name: 'De : '+ comment.user.username, value: comment.preparedHtmlContent.replace("<br />", "\n").replace(/<[^>]*>?/gm, '') },
 	)
@@ -189,8 +198,8 @@ async function sendNotification(comment) {
     .setTimestamp();
 
     if(comment.preparedHtmlContent.match(/<a.*.a>/gm)[0]){
-        lienProduit = comment.preparedHtmlContent.match(/<a.*.a>/gm)[0].replace(/<[^>]*>?/gm, '')
-        if (!lienProduit.includes("https://")) {
+        lienProduit = comment.preparedHtmlContent.match(/<a.*.a>/gm)[0].match(/title.*."/gm)[0].match(/(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/gm)[0].replace(/<[^>]*>?/gm, '')
+        if (!lienProduit.includes("http")) {
             lienProduit = "https://" + lienProduit
         }
         embed.addFields({ name: 'Lien Produit : ', value: '['+lienProduit+']('+lienProduit+')' },)
@@ -207,13 +216,15 @@ async function sendNotification(comment) {
 async function main() {
     console.log("===========Dealabs Price Error Alert===========");
     console.log("Connecting to Dealabs for getting API token ...");
-    //await sendNotification("z")
     await refreshToken();
     console.log("Getting data ...");
     while (true) {
-        await getNewData();
-        await checkNewMessage();
-        await delay(10000);
+        for (let index = 0; index < forumCode.length; index++) {
+            await getNewData(forumCode[index].toString());
+            //console.log(await eval('response.'+forumCode[index]));
+            await checkNewMessage(forumCode[index]);
+            await delay(10000);
+        }
     }
     /** 
     console.log(response);
