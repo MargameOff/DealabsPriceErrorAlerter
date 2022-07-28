@@ -161,18 +161,17 @@ async function getNewData(id) {
         response[id] = data;
         console.log("Data updated, waiting for next update ...");
     } catch (error) {
-        console.log(error);
         console.log('Token are KO, try to get new one');
         await refreshToken();
-        getNewData()
+        await getNewData()
     }
 }
 
 async function checkNewMessage(id) {
     let lastComment = response[id].data[0].data.comments.items[0]
-    if (lastComment.commentId != saveData.lastMessageId[id]) {
+    if (!saveData.lastMessageId[id].includes(lastComment.commentId)) {
         console.log("New message detected, sending notification");
-        saveData.lastMessageId[id] = lastComment.commentId;
+        saveData.lastMessageId[id].push(lastComment.commentId);
         fs.writeFileSync("./saveData.json", JSON.stringify(saveData, null, 2));
         await sendNotification(lastComment, id);
     } else {
