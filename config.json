@@ -1,5 +1,6 @@
 {
     "bot_name": "Dealabs Price Error Alert",
     "bot_avatar": "https://pbs.twimg.com/profile_images/1466421672404258820/VYhbnw79_400x400.png",
-    "webhook": "PLACE YOUR DISCORD WEBOOK"
+    "webhook": "PLACE YOUR DISCORD WEBOOK",
+    "error_webhook": "PLACE YOUR DISCORD ERROR WEBHOOK
 }

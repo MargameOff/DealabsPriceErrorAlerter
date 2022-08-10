@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require("fs");
 const puppeteer = require("puppeteer");
+var _ = require('lodash');
 const { EmbedBuilder, WebhookClient } = require('discord.js');
 
 //Local JSON file for data
@@ -13,6 +14,7 @@ const forumCode = [1063390,1056379]
 
 //Discord.js connexion
 const webhookClient = new WebhookClient({ url: config.webhook });
+const webhookError = new WebhookClient({ url: config.error_webhook });
 
 
 async function refreshToken() {
@@ -186,6 +188,13 @@ async function sendNotification(comment, id) {
     } else {
         title = 'Nouveau Post Suivi d\'erreur de prix !'
     }
+    let photo;
+    if (comment.user.imageUrls == null) {
+        photo = 'https://pbs.twimg.com/profile_images/1466421672404258820/VYhbnw79_400x400.png'
+    } else {
+        photo = 'https://static-pepper.dealabs.com'+comment.user.imageUrls['default.user_small_avatar']
+    }
+    console.log(photo);
     const embed = new EmbedBuilder()
     .setTitle(title)
     .addFields(
@@ -193,16 +202,21 @@ async function sendNotification(comment, id) {
 	)
     .setColor(0x071ca1)
     .setURL(comment.url)
-    .setThumbnail('https://static-pepper.dealabs.com'+comment.user.imageUrls['default.user_small_avatar'])
+    .setThumbnail(photo)
     .setTimestamp();
 
-    if(comment.preparedHtmlContent.match(/<a.*.a>/gm)[0]){
+    try {
+        if(comment.preparedHtmlContent.match(/<a.*.a>/gm)){
         lienProduit = comment.preparedHtmlContent.match(/<a.*.a>/gm)[0].match(/title.*."/gm)[0].match(/(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/gm)[0].replace(/<[^>]*>?/gm, '')
         if (!lienProduit.includes("http")) {
             lienProduit = "https://" + lienProduit
         }
         embed.addFields({ name: 'Lien Produit : ', value: '['+lienProduit+']('+lienProduit+')' },)
     }
+    } catch (error) {
+        console.log('======ERROR======');
+        await sendErrorNotification(error)
+    }    
     webhookClient.send({
         username: config.bot_name,
         avatarURL: config.bot_avatar,
@@ -210,7 +224,20 @@ async function sendNotification(comment, id) {
     });
 }
 
-
+async function sendErrorNotification(error){
+    const embed = new EmbedBuilder()
+    .setTitle('Erreur')
+    .addFields(
+        { name: 'Erreur : ', value: error.toString() },
+    )
+    .setColor(0x071ca1)
+    .setTimestamp();
+    webhookError.send({
+        username: config.bot_name,
+        avatarURL: config.bot_avatar,
+        embeds: [embed],
+    });
+}
 //create main function for the program
 async function main() {
     console.log("===========Dealabs Price Error Alert===========");
