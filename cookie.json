@@ -1,10 +1,1 @@
-{
-  "pepper_session": "",
-  "expires": "",
-  "Max-Age": "",
-  "path": "/",
-  "httponly\nbpn_device_subscribed": "null",
-  "httponly\nguest_user_visit": "1",
-  "httponly\nxsrf_t": "",
-  "samesite": ""
-}
+[]
