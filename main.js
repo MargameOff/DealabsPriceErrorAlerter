@@ -38,6 +38,7 @@ async function refreshToken() {
         console.log("URL saved in ./cookie.json!");
     } catch (e) {
         console.log(e);
+        process.exit(1);
     }
 
 }
@@ -65,6 +66,7 @@ async function getUrlToFetch(id) {
         return xhrResponse.request().url()
     } catch (e) {
         console.log(e);
+        process.exit(1);
     }
 }
 
@@ -90,8 +92,7 @@ async function getNewData(index) {
         console.log("Data updated, waiting for next update ...");
     } catch (error) {
         console.log('Token are KO, try to get new one');
-        await refreshToken();
-        await getNewData()
+        process.exit(1);
     }
 }
 
@@ -142,6 +143,7 @@ async function sendNotification(comment, id) {
     } catch (error) {
         console.log('======ERROR======');
         await sendErrorNotification(error)
+        process.exit(1);
     }    
     webhookClient.send({
         username: config.bot_name,
